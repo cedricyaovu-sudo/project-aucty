@@ -2,8 +2,27 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Aucty — Creator Auction Platform</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#7c3aed" media="(prefers-color-scheme: light)">
+    <meta name="theme-color" content="#0a0a0f" media="(prefers-color-scheme: dark)">
+    <meta name="description" content="Live creator auction platform — bid, message, and follow your favorite creators.">
+
+    <!-- iOS (Add to Home Screen) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Aucty">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+    <!-- Android / Chrome legacy -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="application-name" content="Aucty">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -8509,6 +8528,36 @@
 
         // ============= RENDER =============
         ReactDOM.render(<AuctyApp />, document.getElementById('root'));
+    </script>
+
+    <!-- Register service worker (PWA) -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function () {
+                navigator.serviceWorker.register('sw.js').then(function (reg) {
+                    // Prompt to update if a new worker is waiting on next load.
+                    reg.addEventListener('updatefound', function () {
+                        var nw = reg.installing;
+                        if (!nw) return;
+                        nw.addEventListener('statechange', function () {
+                            if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                                nw.postMessage({ type: 'SKIP_WAITING' });
+                            }
+                        });
+                    });
+                }).catch(function (err) {
+                    console.warn('SW registration failed:', err);
+                });
+
+                // When the new SW takes control, reload so users get fresh HTML.
+                var reloading = false;
+                navigator.serviceWorker.addEventListener('controllerchange', function () {
+                    if (reloading) return;
+                    reloading = true;
+                    window.location.reload();
+                });
+            });
+        }
     </script>
 </body>
 </html>
