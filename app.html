@@ -3529,18 +3529,32 @@
 
         // Deterministic top-bidders for a given auction. Highest bid first.
         function getTopBidders(auction, currentBid) {
-            const seed = auction.id;
+            // Normalize seed: auction.id can be a number (demo data) or a UUID string (Supabase)
+            const rawSeed = auction && auction.id;
+            let seed = 0;
+            if (typeof rawSeed === 'number' && Number.isFinite(rawSeed)) {
+                seed = Math.abs(Math.trunc(rawSeed));
+            } else if (typeof rawSeed === 'string' && rawSeed.length > 0) {
+                for (let k = 0; k < rawSeed.length; k++) {
+                    seed = (seed * 31 + rawSeed.charCodeAt(k)) | 0;
+                }
+                seed = Math.abs(seed);
+            }
+            if (!seed) seed = 1;
+            const safeBid = Number(currentBid);
+            const safeStart = Number(auction && auction.startingBid) || 0;
             const count = 5;
             const out = [];
-            let running = currentBid;
+            let running = Number.isFinite(safeBid) && safeBid > 0 ? safeBid : (safeStart || 100);
             for (let i = 0; i < count; i++) {
-                const user = BID_USERS[(seed * 3 + i * 7) % BID_USERS.length];
+                const user = BID_USERS[((seed * 3) + (i * 7)) % BID_USERS.length];
+                if (!user) continue;
                 const amount = running;
                 const minutesAgo = (i + 1) * ((seed % 4) + 2);
                 out.push({ user, amount, minutesAgo });
                 // each next (older) bid is 3%–12% lower
                 const decrement = Math.round(running * (0.03 + ((seed + i) % 10) / 100));
-                running = Math.max(auction.startingBid, running - Math.max(decrement, 25));
+                running = Math.max(safeStart, running - Math.max(decrement, 25));
             }
             return out;
         }
@@ -5801,8 +5815,9 @@
                 shipping: "Ships within 3 business days."
             };
             const gallery = details.gallery && details.gallery.length > 0 ? details.gallery : [auction.image];
-            const topBidders = getTopBidders(auction, currentBid);
-            const minIncrement = Math.max(Math.round(currentBid * 0.03), 25);
+            const safeBid = Number.isFinite(Number(currentBid)) && Number(currentBid) > 0 ? Number(currentBid) : (Number(auction.startingBid) || 0);
+            const topBidders = getTopBidders(auction, safeBid);
+            const minIncrement = Math.max(Math.round(safeBid * 0.03), 25);
 
             return (
                 <div className="modal-overlay" onClick={onClose}>
@@ -5948,7 +5963,7 @@
                                 <div className="detail-stat">
                                     <div className="detail-stat-label">Current Bid</div>
                                     <div className="detail-stat-value" style={{ color: '#7c3aed' }}>
-                                        ${Number(currentBid).toLocaleString()}
+                                        ${Number(safeBid).toLocaleString()}
                                     </div>
                                 </div>
                                 <div className="detail-stat">
@@ -6031,11 +6046,11 @@
                             <div className="detail-cta">
                                 <div className="detail-cta-info">
                                     <div className="detail-cta-label">Place bid at least</div>
-                                    <div className="detail-cta-amount">${Number(currentBid + minIncrement).toLocaleString()}</div>
+                                    <div className="detail-cta-amount">${Number(safeBid + minIncrement).toLocaleString()}</div>
                                 </div>
                                 <button
                                     className="btn-primary"
-                                    onClick={() => { onPlaceBid(auction.id, currentBid + minIncrement); }}
+                                    onClick={() => { onPlaceBid(auction.id, safeBid + minIncrement); }}
                                     style={{ flex: 1, marginLeft: '12px' }}
                                 >
                                     Place Bid
@@ -8526,8 +8541,87 @@
             );
         }
 
+        // ============= ERROR BOUNDARY =============
+        class AppErrorBoundary extends React.Component {
+            constructor(props) {
+                super(props);
+                this.state = { error: null };
+                this.handleReload = this.handleReload.bind(this);
+            }
+            static getDerivedStateFromError(error) {
+                return { error };
+            }
+            componentDidCatch(error, info) {
+                console.error('Aucty caught error:', error, info);
+            }
+            handleReload() {
+                // Soft reset: clear error and force a reload to recover app state.
+                this.setState({ error: null });
+                try { window.location.reload(); } catch (e) {}
+            }
+            render() {
+                if (this.state.error) {
+                    const msg = String(
+                        (this.state.error && (this.state.error.message || this.state.error.toString())) || 'Unknown error'
+                    );
+                    return (
+                        <div style={{
+                            padding: '24px',
+                            fontFamily: 'system-ui, -apple-system, sans-serif',
+                            background: '#0a0a0f',
+                            color: 'white',
+                            minHeight: '100vh',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <div style={{ maxWidth: '480px', textAlign: 'center' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '12px' }}>⚠️</div>
+                                <div style={{ fontSize: '20px', fontWeight: 700, marginBottom: '8px' }}>
+                                    Something went wrong
+                                </div>
+                                <div style={{
+                                    fontSize: '13px',
+                                    color: '#9ca3af',
+                                    marginBottom: '20px',
+                                    wordBreak: 'break-word',
+                                    fontFamily: 'ui-monospace, Menlo, monospace',
+                                    background: '#1f1f2e',
+                                    padding: '10px 12px',
+                                    borderRadius: '8px'
+                                }}>
+                                    {msg}
+                                </div>
+                                <button
+                                    onClick={this.handleReload}
+                                    style={{
+                                        background: '#7c3aed',
+                                        color: 'white',
+                                        border: 'none',
+                                        padding: '10px 22px',
+                                        borderRadius: '8px',
+                                        fontSize: '14px',
+                                        fontWeight: 600,
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    Reload Aucty
+                                </button>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
         // ============= RENDER =============
-        ReactDOM.render(<AuctyApp />, document.getElementById('root'));
+        ReactDOM.render(
+            <AppErrorBoundary>
+                <AuctyApp />
+            </AppErrorBoundary>,
+            document.getElementById('root')
+        );
     </script>
 
     <!-- Register service worker (PWA) -->
