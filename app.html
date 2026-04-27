@@ -2997,7 +2997,7 @@
             async signInWithMagicLink(email) {
                 const { error } = await supabase.auth.signInWithOtp({
                     email,
-                    options: { emailRedirectTo: window.location.origin }
+                    options: { emailRedirectTo: window.location.origin + '/app.html' }
                 });
                 if (error) throw error;
                 return true;
@@ -3005,7 +3005,7 @@
             async signInWithGoogle() {
                 const { data, error } = await supabase.auth.signInWithOAuth({
                     provider: 'google',
-                    options: { redirectTo: window.location.origin }
+                    options: { redirectTo: window.location.origin + '/app.html' }
                 });
                 if (error) throw error;
                 return data;
