@@ -3052,7 +3052,7 @@
                 q = q.order('created_at', { ascending: false });
                 const { data, error } = await q;
                 if (error) throw error;
-                const auctions = (data || []).map(r => mapAuction(r));
+                const auctions = (data || []).map(r => mapAuction(r)).filter(Boolean);
                 // Fetch collaborators for the auctions in one pass
                 if (auctions.length) {
                     const ids = auctions.map(a => a.id);
@@ -3566,6 +3566,7 @@
         function AuctyApp() {
             const [currentTab, setCurrentTab] = useState('home');
             const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [isGuest, setIsGuest] = useState(false);
             const [authReady, setAuthReady] = useState(false);
             const [currentUser, setCurrentUser] = useState(null);
             const [showOnboarding, setShowOnboarding] = useState(false);
@@ -3942,7 +3943,7 @@
 
             const handleGuestBrowse = () => {
                 setCurrentUser(null);
-                setIsAuthenticated(false);
+                setIsGuest(true);
                 setCurrentTab('home');
             };
 
@@ -3950,6 +3951,7 @@
                 try { await api.signOut(); } catch (e) { console.error(e); }
                 setCurrentUser(null);
                 setIsAuthenticated(false);
+                setIsGuest(false);
                 setCurrentTab('home');
                 showToast('Logged out', 'success');
             };
@@ -4017,12 +4019,12 @@
                 const matchesCategory = selectedCategory === 'All' || auction.category === selectedCategory;
                 const matchesSearch = searchQuery === '' ||
                     auction.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    auction.creator.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    auction.creator?.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                     auction.category.toLowerCase().includes(searchQuery.toLowerCase());
                 return matchesCategory && matchesSearch;
             });
 
-            if (!isAuthenticated) {
+            if (!isAuthenticated && !isGuest) {
                 return (
                     <AuthScreen
                         onSignIn={handleSignIn}
@@ -4718,13 +4720,13 @@
                                         <div key={a.id} className="live-bubble" onClick={() => onOpenLive && onOpenLive(a.id)}>
                                             <div className="live-bubble-ring">
                                                 <img
-                                                    src={a.creator.image}
-                                                    alt={a.creator.name}
+                                                    src={a.creator?.image}
+                                                    alt={a.creator?.name}
                                                     onError={handleImgError}
                                                 />
                                                 <span className="live-bubble-tag">Live</span>
                                             </div>
-                                            <div className="live-bubble-name">{(a.creator.name || '').split(' ')[0]}</div>
+                                            <div className="live-bubble-name">{(a.creator?.name || '').split(' ')[0]}</div>
                                         </div>
                                     ))}
                                 </div>
@@ -4874,12 +4876,12 @@
                         <div>
                             <div className="card-creator">
                                 <img
-                                    src={auction.creator.image}
-                                    alt={auction.creator.name}
+                                    src={auction.creator?.image}
+                                    alt={auction.creator?.name}
                                     className="avatar-tiny"
                                 />
                                 <span className="creator-name">
-                                    {auction.creator.name}
+                                    {auction.creator?.name}
                                     {auction.creator.verified && <span className="verified-small">✓</span>}
                                     {auction.collaborators && auction.collaborators.length > 0 && (
                                         <span style={{ color: '#6b7280', fontWeight: '500' }}>
@@ -4932,12 +4934,12 @@
                         <div>
                             <div className="card-trending-header">
                                 <img
-                                    src={auction.creator.image}
-                                    alt={auction.creator.name}
+                                    src={auction.creator?.image}
+                                    alt={auction.creator?.name}
                                     className="card-trending-avatar"
                                 />
                                 <div className="card-trending-creator">
-                                    {auction.creator.name}
+                                    {auction.creator?.name}
                                     {auction.creator.verified && <span className="card-trending-verify">✓</span>}
                                     {auction.collaborators && auction.collaborators.length > 0 && (
                                         <span style={{ color: '#6b7280', fontWeight: '500', marginLeft: '4px' }}>
@@ -5437,7 +5439,7 @@
                                                             </span>
                                                         </div>
                                                         <div style={{ fontSize: '11px', color: '#6b7280', marginBottom: '6px' }}>
-                                                            ⏱ {auction.endsIn}h left · by {auction.creator.name}
+                                                            ⏱ {auction.endsIn}h left · by {auction.creator?.name}
                                                         </div>
                                                         <div style={{
                                                             display: 'grid', gridTemplateColumns: '1fr 1fr',
@@ -5843,8 +5845,8 @@
                                 {auction.collaborators && auction.collaborators.length > 0 ? (
                                     <div className="avatar-stack">
                                         <img
-                                            src={auction.creator.image}
-                                            alt={auction.creator.name}
+                                            src={auction.creator?.image}
+                                            alt={auction.creator?.name}
                                             style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover', border: '3px solid white' }}
                                         />
                                         {auction.collaborators.slice(0, 3).map(c => (
@@ -5857,11 +5859,11 @@
                                         ))}
                                     </div>
                                 ) : (
-                                    <img src={auction.creator.image} alt={auction.creator.name} className="detail-creator-avatar" />
+                                    <img src={auction.creator?.image} alt={auction.creator?.name} className="detail-creator-avatar" />
                                 )}
                                 <div>
                                     <div className="detail-creator-name">
-                                        {auction.creator.name}
+                                        {auction.creator?.name}
                                         {auction.creator.verified && <span className="detail-verified">✓</span>}
                                         {auction.collaborators && auction.collaborators.length > 0 && (
                                             <span style={{ color: '#6b7280', fontWeight: '500', fontSize: '13px' }}>
@@ -5893,13 +5895,13 @@
                                             padding: '10px', background: '#f9fafb', borderRadius: '10px'
                                         }}>
                                             <img
-                                                src={auction.creator.image}
-                                                alt={auction.creator.name}
+                                                src={auction.creator?.image}
+                                                alt={auction.creator?.name}
                                                 style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }}
                                             />
                                             <div style={{ flex: 1, minWidth: 0 }}>
                                                 <div style={{ fontSize: '13px', fontWeight: '700', color: '#0a0a0f' }}>
-                                                    {auction.creator.name}
+                                                    {auction.creator?.name}
                                                     {auction.creator.verified && <span style={{ color: '#7c3aed', marginLeft: '4px' }}>✓</span>}
                                                 </div>
                                                 <div style={{ fontSize: '11px', color: '#7c3aed', fontWeight: '700' }}>
@@ -5973,7 +5975,7 @@
                                     <div className="detail-section-title">From the creator</div>
                                     <VoiceNotePlayer
                                         src={auction.voiceNote || details.voiceNote}
-                                        label={`${auction.creator.name} tells the story`}
+                                        label={`${auction.creator?.name} tells the story`}
                                         initialDuration={auction.voiceNoteDuration || details.voiceNoteDuration || 0}
                                     />
                                 </div>
@@ -6109,7 +6111,7 @@
                                                 {auction.title}
                                             </div>
                                             <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
-                                                by {auction.creator.name}
+                                                by {auction.creator?.name}
                                             </div>
                                             <div style={{ fontSize: '24px', fontWeight: '800', color: '#7c3aed' }}>
                                                 ${auction.winningBid}
@@ -8237,9 +8239,9 @@
                         <div className="live-top-bar">
                             <div className="live-top-left">
                                 <div className="live-top-creator">
-                                    <img src={auction.creator.image} alt={auction.creator.name} onError={handleImgError} />
+                                    <img src={auction.creator?.image} alt={auction.creator?.name} onError={handleImgError} />
                                     <span className="live-top-creator-name">
-                                        {auction.creator.name}
+                                        {auction.creator?.name}
                                         {auction.creator.verified && <span style={{ marginLeft: '4px', color: '#1d9bf0' }}>✓</span>}
                                     </span>
                                 </div>
